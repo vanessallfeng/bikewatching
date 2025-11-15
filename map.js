@@ -1,7 +1,7 @@
 // Import D3 as an ES module
 import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7.9.0/+esm';
 
-// Import Mapbox as an ESM module
+// Import Mapbox as an ES module
 import mapboxgl from 'https://cdn.jsdelivr.net/npm/mapbox-gl@2.15.0/+esm';
 
 // URL for Bluebikes stations JSON
@@ -34,7 +34,38 @@ function getCoords(station) {
 
 // Wait for the map to load before adding data and markers
 map.on('load', async () => {
-  // --- Boston bike lanes source + layer ---
+  // ----------------------------------------------------
+  // Step 4.1: Importing and parsing the traffic data
+  // ----------------------------------------------------
+  const tripsUrl =
+    'https://dsc106.com/labs/lab07/data/bluebikes-traffic-2024-03.csv';
+
+  let trips = [];
+  try {
+    trips = await d3.csv(tripsUrl);
+    console.log('Loaded trips CSV:', trips);
+  } catch (err) {
+    console.error('Error loading trips CSV:', err);
+  }
+
+  // ----------------------------------------------------
+  // Step 4.2: Calculating traffic at each station
+  // ----------------------------------------------------
+  const departures = d3.rollup(
+    trips,
+    v => v.length,
+    d => d.start_station_id
+  );
+
+  const arrivals = d3.rollup(
+    trips,
+    v => v.length,
+    d => d.end_station_id
+  );
+
+  // ----------------------------------------------------
+  // Bike lane layers (Boston + Cambridge)
+  // ----------------------------------------------------
   map.addSource('boston_route', {
     type: 'geojson',
     data: 'https://bostonopendata-boston.opendata.arcgis.com/datasets/boston::existing-bike-network-2022.geojson',
@@ -45,13 +76,12 @@ map.on('load', async () => {
     type: 'line',
     source: 'boston_route',
     paint: {
-      'line-color': '#ff69b4', // hot pink
+      'line-color': '#ff69b4', // hot pink!
       'line-width': 3,
       'line-opacity': 0.6,
     },
   });
 
-  // --- Cambridge bike lanes source + layer ---
   map.addSource('cambridge_route', {
     type: 'geojson',
     data: 'https://cambridgegis.github.io/gisdata/bike-lanes.geojson',
@@ -62,59 +92,91 @@ map.on('load', async () => {
     type: 'line',
     source: 'cambridge_route',
     paint: {
-      'line-color': '#ff69b4', // hot pink
+      'line-color': '#ff69b4',
       'line-width': 3,
       'line-opacity': 0.6,
     },
   });
 
-  // --- Step 3.1: Fetch Bluebikes stations JSON with D3 ---
+  // ----------------------------------------------------
+  // Step 3.1: Fetch Bluebikes station JSON with D3
+  // ----------------------------------------------------
   let jsonData;
   try {
     const jsonUrl = INPUT_BLUEBIKES_CSV_URL;
-
-    // Await JSON fetch
     jsonData = await d3.json(jsonUrl);
-
-    console.log('Loaded JSON Data:', jsonData); // Log to verify structure
+    console.log('Loaded JSON Data:', jsonData);
   } catch (error) {
-    console.error('Error loading JSON:', error); // Handle errors
-    return; // stop if we couldn't load data
+    console.error('Error loading JSON:', error);
+    return;
   }
 
   // Get the stations array from the JSON
-  const stations = jsonData.data.stations;
+  let stations = jsonData.data.stations;
   console.log('Stations Array:', stations);
 
-  // --- Step 3.3: Add station markers as SVG circles ---
+  // ----------------------------------------------------
+  // Step 4.2 (cont.): Attach arrivals/departures/totalTraffic
+  // ----------------------------------------------------
+  stations = stations.map(station => {
+    const id = station.short_name;
 
-  // Append circles to the SVG for each station
+    station.arrivals = arrivals.get(id) ?? 0;
+    station.departures = departures.get(id) ?? 0;
+    station.totalTraffic = station.arrivals + station.departures;
+
+    return station;
+  });
+
+  console.log('Stations with traffic:', stations);
+
+  // ----------------------------------------------------
+  // Step 4.3: Size markers according to traffic
+  // ----------------------------------------------------
+  const radiusScale = d3
+    .scaleSqrt()
+    .domain([0, d3.max(stations, d => d.totalTraffic)])
+    .range([0, 25]); // min & max radius
+
+  // Step 3.3 & 4.3: Add station markers as SVG circles
   const circles = svg
     .selectAll('circle')
     .data(stations)
     .enter()
     .append('circle')
-    .attr('r', 5) // Radius of the circle
-    .attr('fill', 'steelblue') // Circle fill color
-    .attr('stroke', 'white') // Circle border color
-    .attr('stroke-width', 1) // Circle border thickness
-    .attr('opacity', 0.8); // Circle opacity
+    .attr('r', d => radiusScale(d.totalTraffic))
+    .attr('fill', 'steelblue')
+    .attr('stroke', 'white')
+    .attr('stroke-width', 1)
+    .attr('fill-opacity', 0.6);
+
+  // ----------------------------------------------------
+  // Step 4.4: Add browser tooltips with exact numbers
+  // ----------------------------------------------------
+  circles
+    .each(function (d) {
+      d3.select(this)
+        .append('title')
+        .text(
+          `${d.totalTraffic} trips (${d.departures} departures, ${d.arrivals} arrivals)`
+        );
+    });
 
   // Function to update circle positions when the map moves/zooms
   function updatePositions() {
     circles
-      .attr('cx', d => getCoords(d).cx) // Set x-position
-      .attr('cy', d => getCoords(d).cy); // Set y-position
+      .attr('cx', d => getCoords(d).cx)
+      .attr('cy', d => getCoords(d).cy);
   }
 
   // Initial position update when map loads
   updatePositions();
 
   // Reposition markers on map interactions
-  map.on('move', updatePositions); // Update during map movement
-  map.on('zoom', updatePositions); // Update during zooming
+  map.on('move', updatePositions);   // Update during map movement
+  map.on('zoom', updatePositions);   // Update during zooming
   map.on('resize', updatePositions); // Update on window resize
-  map.on('moveend', updatePositions); // Final adjustment after movement ends
+  map.on('moveend', updatePositions);// Final adjustment after movement ends
 });
 
 // Check that Mapbox GL JS is loaded
