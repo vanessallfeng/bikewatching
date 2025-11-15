@@ -6,28 +6,102 @@ body {
   width: 100%;
 }
 
-/* Put the title/paragraph on top, map fills the rest */
+/* We’ll share these color vars between circles and legend */
+:root {
+  --color-departures: steelblue;
+  --color-arrivals: darkorange;
+}
+
+/* The page header sits above the map */
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+/* Slider row */
+.time-filter {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.time-filter input[type="range"] {
+  flex: 1;
+}
+
+.time-filter time {
+  font-variant-numeric: tabular-nums;
+}
+
+.time-filter em {
+  color: #666;
+  font-style: italic;
+}
+
+/* Map fills the remaining vertical space */
 body {
   display: flex;
   flex-direction: column;
 }
 
-/* Make the map actually visible */
+/* Make the map visible */
 #map {
   width: 100%;
-  flex: 1;           /* let it take all remaining space */
-  min-height: 400px; /* fallback height in case viewport is short */
+  flex: 1;
+  min-height: 400px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
+  position: relative;
 }
+
+/* SVG overlay on top of Mapbox */
 #map svg {
   position: absolute;
+  inset: 0;
   z-index: 1;
   width: 100%;
   height: 100%;
-  pointer-events: none;
+  pointer-events: none; /* allow map panning */
 }
 
+/* Station circles */
 #map svg circle {
-  pointer-events: auto;
+  pointer-events: auto; /* so browser tooltips work */
+  stroke: white;
+  stroke-width: 1;
+  fill-opacity: 0.6;
+
+  /* Color based on CSS variable set from JS */
+  fill: color-mix(
+    in oklch,
+    var(--color-departures) calc(100% * var(--departure-ratio)),
+    var(--color-arrivals)
+  );
+}
+
+/* Legend */
+.legend {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 1px; /* small gap between swatches */
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.legend div {
+  flex: 1;
+  padding: 0.25rem 0.75rem;
+  color: white;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background-color: color-mix(
+    in oklch,
+    var(--color-departures) calc(100% * var(--departure-ratio)),
+    var(--color-arrivals)
+  );
 }
