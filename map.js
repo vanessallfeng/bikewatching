@@ -24,14 +24,25 @@ map.on('load', async () => {
     type: 'line',
     source: 'boston_route',
     paint: {
-      'line-color': 'green',
-      'line-width': 3,
-      'line-opacity': 0.4,
+      'line-color': '#ff69b4',
+      'line-width': 5,
+      'line-opacity': 0.6,
     },
   });
 });
 
-
+map.addSource('cambridge_route', {
+  type: 'geojson',
+  data: 'https://cambridgegis.github.io/gisdata/bike-lanes.geojson',
+});
+map.addLayer({
+    id: 'cambridge-bike-lanes',
+    type: 'line',
+    source: 'cambridge_route',
+    paint: {
+      'line-color': '#ff69b4',
+      'line-width': 5,
+      'line-opacity': 0.6,
 
 // Check that Mapbox GL JS is loaded
 console.log('Mapbox GL JS Loaded:', mapboxgl);
