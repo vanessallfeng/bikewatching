@@ -9,7 +9,6 @@ body {
   padding: 1em;
 }
 
-/* Header with title + slider */
 .top-bar {
   display: flex;
   align-items: baseline;
